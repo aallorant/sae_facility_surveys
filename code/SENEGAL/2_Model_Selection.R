@@ -42,7 +42,7 @@ dat<-read_csv(paste0(loc,"All_SEN_",as.character(today()-2),".csv")) %>%
          sampling = ifelse(year %in% c(2013,2014), 1,
                            ifelse(year %in% c(2015,2016), 2, 
                                   ifelse(year == 2017, 3, 4))),
-         sampling = factor(sampling))
+         sampling = factor(sampling)) # this variable captures the different phases in SPA survey sampling in SEN between 2013 and 2019
 
 # read in the covariates
 covariates <- readRDS(paste0(country.file,"covariates/covariates_by_ad2.RDS")) %>%
@@ -97,10 +97,14 @@ mat <- nb2mat(nb.r, style="B",zero.policy=TRUE) # mat is the 0/1 adjacency matri
 indicators<-c("logit_sara_index","logit_fifteen.assess")
 
 
-groups<-expand.grid(outcome=indicators)
-groups_all<-data.frame(outcome=indicators)
+mga<-c("public","private")
+factype<-c("clinic","health center", "hospital")
+groups_mga<-expand.grid(outcome=indicators,mga=mga, factype = "ALL")
+groups_factype<-expand.grid(outcome=indicators,mga="ALL", factype = factype)
+groups_all<-data.frame(outcome=indicators,mga="ALL", factype = "ALL")#),mga="ALL"
 
-results<-rbind(groups_all)
+results<-rbind(groups_all,groups_mga, groups_factype)
+# results<-rbind(groups_all)
 results$var<-paste0("var_",results$outcome)
 
 #######################
@@ -111,7 +115,10 @@ for(j in 1:nrow(results)){
                " outcomes groups. ",Sys.time()))
   source("/UsefulFunctions/SAE_Models.R")
   
-  All<-filter(dat,department!="ALL")
+  All<-filter(dat,department!="ALL", mga == results$mga[j],
+              factype == results$factype[j]) %>%
+    mutate(mga = ifelse(is.na(mga), results$mga[j], mga),
+           factype = ifelse(is.na(factype), results$factype[j], factype))
   
   All<-All%>%left_join(key)
   
@@ -138,12 +145,8 @@ for(j in 1:nrow(results)){
 
   
   pred.all<-unique(All[,c("period.id","period.id2","period.id3","dist.id","dist.id2","dist.id3",
-                          "row_num","department","year","ADM1_FR",
-                          "hw_density","hdi","motorized_hcf",
-                          "landcover","tt_hcf",
-                          "map_pf_prevalence" ,"lri_inc","u5m","edu_mean","ntl_harm",
-                          "ghslurbanicity","dmspntl","worldpop_u5", "access",
-                          "elevation","gdp","diarrhea_prevalence")])
+                          "row_num","department","year","hw_density","hdi","tt_hcf","landcover",
+                          "elevation", "access","gdp")])
   
   pred.all<-pred.all%>%mutate(outcome=NA, prec=NA, sampling = NA,preds=1)
   
@@ -220,7 +223,8 @@ for(j in 1:nrow(results)){
     
   }
   write_csv(model_results,paste0("output/ModelSelection/models",
-                                 "_",results$outcome[j],".csv"))
+                                 "_",results$outcome[j],"_",results$mga[j],
+                                 "_",results$factype[j],".csv"))
   
   
 }

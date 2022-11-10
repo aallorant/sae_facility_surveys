@@ -1,3 +1,9 @@
+#######################################################
+### Identifying the best model
+
+### this file will read the fitted
+### models and compare them in terms of goodness of fit indicators including DIC, CPO and WAIC.
+### Finally, it saves the best performing model across these indicators.
 
 rm(list=ls())
 

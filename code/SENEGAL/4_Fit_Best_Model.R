@@ -83,38 +83,37 @@ out.pred <- NULL
 for(j in 1:nrow(results)){
   print(paste0(j," of ",nrow(results),
                " outcomes groups. ",Sys.time()))
-  All<-filter(dat,department!="ALL")# & mga == results$mga[j])
+  All<-filter(dat,department!="ALL", mga == results$mga[j],
+              factype == results$factype[j]) %>%
+    mutate(mga = ifelse(is.na(mga), results$mga[j], mga),
+           factype = ifelse(is.na(factype), results$factype[j], factype))
   
   All<-All%>%left_join(key)
   
   #------------------------------------------------------------------#
-  #------ add in all missing timepoints from 2013 through 2020 ------#
+  #------ add in all missing timepoints from 2010 through 2020 ------#
   #------------------------------------------------------------------#
   
   department.key<-unique(All[,c("row_num","department")])
   
   
-  grid<-expand.grid(row_num=c(1:45),year=c(2013:2019))
+  grid<-expand.grid(row_num=c(1:45),year=c(2010:2020))
   grid<-grid%>%left_join(department.key)
   dim(grid)
   dim(All)
   
   All<-All%>%right_join(grid)
   dim(All)
- 
   
   # creating some variables for the random effects #
   All$period.id3<-All$period.id2<-All$period.id<-as.numeric(as.factor(All$year))
   All$dist.id3<-All$dist.id2<-All$dist.id<-All$row_num
   
   All<-arrange(All,row_num,year)
-  
+
   pred.all<-unique(All[,c("period.id","period.id2","period.id3","dist.id","dist.id2","dist.id3",
-                          "row_num","department","year","hw_density","hdi","motorized_hcf",
-                          "landcover","tt_hcf",
-                          "map_pf_prevalence" ,"lri_inc","u5m","edu_mean","ntl_harm",
-                          "ghslurbanicity","dmspntl","worldpop_u5", "access",
-                          "elevation","gdp","diarrhea_prevalence")])
+                          "row_num","department","year","hw_density","hdi","tt_hcf","landcover",
+                          "elevation", "access","gdp")])
   pred.all<-pred.all%>%mutate(outcome=NA, prec=NA, sampling = NA,preds=1)
   
   
@@ -140,127 +139,57 @@ for(j in 1:nrow(results)){
   
   prior.iid = c(0.5,0.008)
   prior.besag = c(0.5,0.008)
-
-  # enforcing the sum to one constraint on the survey random effects
+  
+  # creating the survey RE sum-to-one constraint
   A <- matrix(1, ncol = 4, nrow = 1)
   e <- matrix(0, ncol = 1)
-
+  ############################
+  # -- set up some models -- #
+  
+  
+  # -- model 1: no interactions -- #
   if(results$model[j]==1){
     # -- model 1: iid RE department -- #
-    model <- outcome ~ f(dist.id, model="iid", param=prior.iid) +  # department random effect
-      f(period.id, model=results$time[j],  param=prior.iid) + # time smoothing process (random walk)
-      f(period.id2, model="iid",  param=prior.iid) + # time iid
-      f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) # interaction time-space
- 
+    model <- outcome ~ f(dist.id, model="iid", param=prior.iid) +  # department effect
+      f(period.id, model=results$time[j],  param=prior.iid) +  # random walk 
+      f(period.id2, model="iid",  param=prior.iid) +
+      f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) 
+    # iid time
   }
   
   if(results$model[j]==2){
-
-    model <- outcome ~ f(dist.id, model="iid", param=prior.iid) +  # department random effect
-      f(period.id, model=results$time[j],  param=prior.iid) +  # time smoothing process (random walk)
+    # -- model 2: iid RE department + survey RE or sampling for SEN-- #
+    model <- outcome ~ f(dist.id, model="iid", param=prior.iid) +  # department effect
+      f(period.id, model=results$time[j],  param=prior.iid) +  # random walk 
       f(period.id2, model="iid",  param=prior.iid) +   # iid time
-      f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag)+ # interaction time-space
-        f(sampling, model="iid", param=prior.iid, extraconstr = list(A = A, e = e)) 
-    # survey random effects with sum-to-one constraint
+      f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag)+
+              f(sampling, model="iid", param=prior.iid, extraconstr = list(A = A, e = e)) 
+    # department X time
   }
   
   if(results$model[j]==3){
-    if(j == 1){
-      model <- outcome ~ f(dist.id, model="iid", param=prior.iid) +  # department effect
-        f(period.id, model=results$time[j],  param=prior.iid) +  # random walk 
-        f(period.id2, model="iid",  param=prior.iid) +  # iid time
-        f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) +# space-time interaction
-        log(elevation) + log(gdp) + log(u5m) + # covariates
-        log(motorized_hcf) +
-        dmspntl + scale(ghslurbanicity) + log(diarrhea_prevalence)+
-        log(access) + scale(landcover) +
-        scale(lri_inc) + log(worldpop_u5)
-    }
-    if(j == 2){
-      model <- outcome ~ f(dist.id, model="iid", param=prior.iid) +  # department effect
-        f(period.id, model=results$time[j],  param=prior.iid) +  # random walk 
-        f(period.id2, model="iid",  param=prior.iid) +  
-        f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) +# iid time
-        scale(hw_density) + dmspntl + scale(ghslurbanicity) +
-        log(access) + scale(landcover) + scale(map_pf_prevalence) + 
-        scale(lri_inc) + log(worldpop_u5)
-    }
-    if(j == 3){
-      model <- outcome ~ f(dist.id, model="iid", param=prior.iid) +  # department effect
-        f(period.id, model=results$time[j],  param=prior.iid) +  # random walk 
-        f(period.id2, model="iid",  param=prior.iid) +  
-        f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) +# iid time
-        scale(edu_mean) + log(u5m) + 
-        log(motorized_hcf) +
-        dmspntl + scale(ghslurbanicity) + scale(hdi)+
-        scale(landcover) +scale(map_pf_prevalence)+
-        scale(lri_inc)
-    }
-    if(j == 4){
-      model <- outcome ~ f(dist.id, model="iid", param=prior.iid) +  # department effect
-        f(period.id, model=results$time[j],  param=prior.iid) +  # random walk 
-        f(period.id2, model="iid",  param=prior.iid) +  
-        f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) +# iid time
-        log(access) + 
-        log(tt_hcf) +scale(gdp)+
-        scale(lri_inc) + log(worldpop_u5)
-    }
-
-
+    # -- model 3: iid RE department + covariates -- #
+    model <- outcome ~ f(dist.id, model="iid", param=prior.iid) +  # department effect
+      f(period.id, model=results$time[j],  param=prior.iid) +  # random walk 
+      f(period.id2, model="iid",  param=prior.iid) +  
+      f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) +# iid time
+      scale(hw_density) + scale(gdp) + scale(hdi) + scale(elevation) +
+      scale(tt_hcf) + scale(access) + scale(landcover)
   }  
   
   if(results$model[j]==4){
-
-    if(j == 1){
-      model <- outcome ~ f(dist.id, model="iid", param=prior.iid) +  # department effect
-        f(period.id, model=results$time[j],  param=prior.iid) +  # random walk 
-        f(period.id2, model="iid",  param=prior.iid) +  
-        f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) +# iid time
-          f(sampling, model="iid", param=prior.iid, extraconstr = list(A = A, e = e))  +
-        log(elevation) + log(gdp) + log(u5m) + 
-        log(motorized_hcf) +
-        dmspntl + scale(ghslurbanicity) + log(diarrhea_prevalence)+
-        log(access) + scale(landcover) +
-        scale(lri_inc) + log(worldpop_u5)
-    }
-    if(j == 2){
-      model <- outcome ~ f(dist.id, model="iid", param=prior.iid) +  # department effect
-        f(period.id, model=results$time[j],  param=prior.iid) +  # random walk 
-        f(period.id2, model="iid",  param=prior.iid) +  
-        f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) +# iid time
-          f(sampling, model="iid", param=prior.iid, extraconstr = list(A = A, e = e))  +
-        scale(hw_density) + dmspntl + scale(ghslurbanicity) +
-        log(access) + scale(landcover) + scale(map_pf_prevalence) + 
-        scale(lri_inc) + log(worldpop_u5)
-    }
-    if(j == 3){
-      model <- outcome ~ f(dist.id, model="iid", param=prior.iid) +  # department effect
-        f(period.id, model=results$time[j],  param=prior.iid) +  # random walk 
-        f(period.id2, model="iid",  param=prior.iid) +  
-        f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) +# iid time
-          f(sampling, model="iid", param=prior.iid, extraconstr = list(A = A, e = e))  +
-        scale(edu_mean) + log(u5m) + 
-        log(motorized_hcf) +
-        dmspntl + scale(ghslurbanicity) + scale(hdi)+
-        scale(landcover) +scale(map_pf_prevalence)+
-        scale(lri_inc)
-    }
-    if(j == 4){
-      model <- outcome ~ f(dist.id, model="iid", param=prior.iid) +  # department effect
-        f(period.id, model=results$time[j],  param=prior.iid) +  # random walk 
-        f(period.id2, model="iid",  param=prior.iid) +  
-        f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) +# iid time
-          f(sampling, model="iid", param=prior.iid, extraconstr = list(A = A, e = e)) + scale(ntl_harm) + 
-        log(access) + 
-        log(tt_hcf) +scale(gdp)+
-        scale(lri_inc) + log(worldpop_u5)
-    }
-    
-
+    # -- model 4: iid RE department + survey RE or sampling for SEN + selected covariates-- #
+    model <-  outcome ~ f(dist.id, model="iid", param=prior.iid) +  # department effect
+      f(period.id, model=results$time[j],  param=prior.iid) +  # random walk 
+      f(period.id2, model="iid",  param=prior.iid) +   # iid time
+      f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag)+
+              f(sampling, model="iid", param=prior.iid, extraconstr = list(A = A, e = e))   + 
+      scale(hw_density) + scale(gdp) + scale(hdi) + scale(elevation) +
+      scale(tt_hcf) + scale(access) + scale(landcover)
   } 
   
   if(results$model[j]==5){
-
+    # -- model 5: spatial RE - no interaction -- #
     model <- outcome ~ f(dist.id, model=results$space[j], param=prior.iid, graph=mat) +  # department effect
       f(period.id, model=results$time[j],  param=prior.iid) +  # random walk
       f(period.id2, model="iid",  param=prior.iid) +
@@ -275,56 +204,18 @@ for(j in 1:nrow(results)){
       f(period.id, model=results$time[j],  param=prior.iid) +  # random walk
       f(period.id2, model="iid",  param=prior.iid) +  # iid time
       f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) +  # department X time
-        f(sampling, model="iid", param=prior.iid, extraconstr = list(A = A, e = e))  
+              f(sampling, model="iid", param=prior.iid, extraconstr = list(A = A, e = e))  
   } 
   
   if(results$model[j]==7){
-
-    if(j == 1){
-      model <- outcome ~ f(dist.id, model=results$space[j], param=prior.iid, graph=mat) +  # department effect
-        f(period.id, model=results$time[j],  param=prior.iid) +  # random walk
-        f(period.id2, model="iid",  param=prior.iid) +  # iid time
-        f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) +  # department X time
-          f(sampling, model="iid", param=prior.iid, extraconstr = list(A = A, e = e))  +
-        log(elevation) + log(gdp) + log(u5m) + 
-        log(motorized_hcf) +
-        dmspntl + scale(ghslurbanicity) + log(diarrhea_prevalence)+
-        log(access) + scale(landcover) +
-        scale(lri_inc) + log(worldpop_u5)
-    }
-    if(j == 2){
-      model <- outcome ~ f(dist.id, model=results$space[j], param=prior.iid, graph=mat) +  # department effect
-        f(period.id, model=results$time[j],  param=prior.iid) +  # random walk
-        f(period.id2, model="iid",  param=prior.iid) +  # iid time
-        f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) +  # department X time
-          f(sampling, model="iid", param=prior.iid, extraconstr = list(A = A, e = e))  +
-        scale(hw_density) + dmspntl + scale(ghslurbanicity) +
-        log(access) + scale(landcover) + scale(map_pf_prevalence) + 
-        scale(lri_inc) + log(worldpop_u5)
-    }
-    if(j == 3){
-      model <- outcome ~ f(dist.id, model=results$space[j], param=prior.iid, graph=mat) +  # department effect
-        f(period.id, model=results$time[j],  param=prior.iid) +  # random walk
-        f(period.id2, model="iid",  param=prior.iid) +  # iid time
-        f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) +  # department X time
-          f(sampling, model="iid", param=prior.iid, extraconstr = list(A = A, e = e))  +
-        scale(edu_mean) + log(u5m) + 
-        log(motorized_hcf) +
-        dmspntl + scale(ghslurbanicity) + scale(hdi)+
-        scale(landcover) +scale(map_pf_prevalence)+
-        scale(lri_inc)
-    }
-    if(j == 4){
-      model <- outcome ~ f(dist.id, model=results$space[j], param=prior.iid, graph=mat) +  # department effect
-        f(period.id, model=results$time[j],  param=prior.iid) +  # random walk
-        f(period.id2, model="iid",  param=prior.iid) +  # iid time
-        f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) +  # department X time
-          f(sampling, model="iid", param=prior.iid, extraconstr = list(A = A, e = e)) + 
-        scale(ntl_harm) + 
-        log(access) + 
-        log(tt_hcf) +scale(gdp)+
-        scale(lri_inc) + log(worldpop_u5)
-    }
+    # -- model 8: space-time + survey RE or sampling for SEN + selected covariates -- #
+    model <- outcome ~ f(dist.id, model=results$space[j], param=prior.iid, graph=mat) +  # department effect
+      f(period.id, model=results$time[j],  param=prior.iid) +  # random walk
+      f(period.id2, model="iid",  param=prior.iid) +  # iid time
+      f(period.id3, model=results$time[j], replicate=dist.id, param=prior.besag) +  # department X time
+              f(sampling, model="iid", param=prior.iid, extraconstr = list(A = A, e = e))   + 
+      scale(hw_density) + scale(gdp) + scale(hdi) + scale(elevation) +
+      scale(tt_hcf) + scale(access) + scale(landcover)
   } 
   
   #######################################
@@ -347,17 +238,20 @@ for(j in 1:nrow(results)){
   mod_dat$up<-expit(mod$summary.fitted.values$`0.975quant`)
   mod_dat$low<-expit(mod$summary.fitted.values$`0.025quant`)
   
-  loc<-paste0(substr(results$outcome[j],7,30))
+  loc<-paste0(substr(results$outcome[j],7,20),
+              "_mga",results$mga[j],"_fac",results$factype[j])
  
   ###############################
   # -- save the model output -- #
   ###############################
   pred<-filter(mod_dat,preds==1) %>%
     dplyr::select(department,year,up,low,mean) %>%
-    mutate(indicator = results$outcome[j])
+    mutate(indicator = results$outcome[j],
+           mga = results$mga[j],
+           factype = results$factype[j])
   
   #
   out.pred <- rbind(out.pred, pred)
-  save(mod,mod_dat,All,file=paste0("output/Model_Fits/",loc,"_model.RDATA"))
+  save(mod,mod_dat,All,file=paste0("output/department/Model_Fits/",loc,"_model.RDATA"))
 }
-saveRDS(out.pred,file=paste0("output/Preds/_preds.rds"))
+saveRDS(out.pred,file=paste0("output/department/Preds/_preds.rds"))
