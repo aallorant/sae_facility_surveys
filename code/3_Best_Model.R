@@ -7,8 +7,8 @@
 
 rm(list=ls())
 
-country.file <- paste0("<<<< FILEPATH REDACTED >>>>", "/SENEGAL/")
-setwd(country.file)
+main_dir <- paste0("<<<< FILEPATH REDACTED >>>>", "/SENEGAL/")
+setwd(main_dir)
 
 #####################################
 # -- load packages and functions -- #

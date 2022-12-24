@@ -31,7 +31,6 @@ processed_full<-processed
 # combine the SPA surveys
 dat<-read_csv(paste0(loc,processed[1]))
 for(i in 2:length(processed_full)){
-  # i<-8
   tmp<-read_csv(paste0(loc,processed[i]))
   dat<-rbind(dat,tmp[,names(dat)])
   
@@ -46,34 +45,19 @@ unique(dat$department)
 unique(dat$department)[!unique(dat$department)%in%unique(tolower(shape2@data[,c("ADM2_FR")]))]
 
 
-# logit transformation for the mean and variance of the survey estimates
-logit_outcome<-function(indicator,thresh){
-  
-  logit.indicator<-ifelse(!is.na(indicator),logit(indicator),NA)
-  logit.indicator<-ifelse(indicator<thresh | indicator>(1-thresh),NA,logit.indicator)
-  logit.indicator
-}
-
-var_logit_outcome<-function(indicator,se,thresh){
-  var_logit<-(se^2)/(indicator^2*(1-indicator)^2)
-  var_logit<-ifelse(se<thresh,NA, var_logit)
-  var_logit
-}
-
-
 # Add Columns of logit transformed outcomes #
 threshold<-0.00001
 dat<-dat%>%
   filter(!is.na(department)) %>%
   mutate(
-                  sara_index = as.numeric(sara_index),
-                  se.sara_index=as.numeric(se.sara_index),
-                  logit_sara_index=logit_outcome(sara_index,thresh=threshold),
-                  var_logit_sara_index= var_logit_outcome(sara_index,se.sara_index,thresh=threshold),
-                  fifteen.assess = as.numeric(fifteen.assess),
-                  se.fifteen.assess=as.numeric(se.fifteen.assess),
-                  logit_fifteen.assess=logit_outcome(fifteen.assess,thresh=threshold),
-                  var_logit_fifteen.assess= var_logit_outcome(fifteen.assess,se.fifteen.assess,thresh=threshold)
+                  readiness = as.numeric(readiness),
+                  se.readiness=as.numeric(se.readiness),
+                  logit_readiness=logit_outcome(readiness,thresh=threshold),
+                  var_logit_readiness= var_logit_outcome(readiness,se.readiness,thresh=threshold),
+                  process_quality = as.numeric(process_quality),
+                  se.process_quality=as.numeric(se.process_quality),
+                  logit_process_quality=logit_outcome(process_quality,thresh=threshold),
+                  var_logit_process_quality= var_logit_outcome(process_quality,se.process_quality,thresh=threshold)
                                                                
                                                                
 )

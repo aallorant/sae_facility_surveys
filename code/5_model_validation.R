@@ -1,11 +1,11 @@
 #####################################################
-## Out-of-sample testing for assessing the robusteness of the results
+## Hold-one-area-out cross-validation
 #####################################################
 rm(list=ls())
 
 
-country.file <- paste0("<<<< FILEPATH REDACTED >>>>", "/SENEGAL/")
-setwd(country.file)
+main_dir <- paste0("<<<< FILEPATH REDACTED >>>>", "/SENEGAL/")
+setwd(main_dir)
 
 #####################################
 # -- load packages and functions -- #
@@ -15,13 +15,13 @@ source("UsefulFunctions/expit_logit.R")
 source("UsefulFunctions/stepwise_vif.R")
 
 
-loc<-paste0(country.file,"processed_data")
+loc<-paste0(main_dir,"processed_data")
 
 ##############################################
 # -- Read in the shapefile -- #
 ##############################################
-shape1<- shapefile(paste0(country.file,"Shapes/sdr_subnational_boundaries_2020-12-13/shps/sdr_subnational_boundaries"))
-shape2<-  shapefile(paste0(country.file,"Shapes/adm2_3/sen_admbnda_adm2_1m_gov_ocha_20190426"))
+shape1<- shapefile(paste0(main_dir,"Shapes/sdr_subnational_boundaries_2020-12-13/shps/sdr_subnational_boundaries"))
+shape2<-  shapefile(paste0(main_dir,"Shapes/adm2_3/sen_admbnda_adm2_1m_gov_ocha_20190426"))
 
 # adding a row number to the shape1 object, will be handy for plotting later on
 shape1@data$row_num<-1:nrow(shape1@data)
@@ -33,53 +33,24 @@ key$department<-tolower(key$ADM2_FR)
 
 ##################################
 # -- read in the combine data -- #
-dat<-read_csv(paste0(loc,"All_SEN_",as.character(today()-2),".csv")) %>%
-  mutate(year = ifelse(year == 2020, 2019, year),
-         sampling = ifelse(year %in% c(2013,2014), 1,
-                           ifelse(year %in% c(2015,2016), 2, 
-                                  ifelse(year == 2017, 3, 4))),
-         sampling = factor(sampling))
+
+dat<-fread((paste0(loc,"All_SEN_",as.character(today()),".csv")))
+
+# captures the different phases in SPA survey sampling in SEN between 2013 and 2019
+dat[year %in% 2013:2014 ,sampling := 1]
+dat[year %in% 2015:2016 ,sampling := 2]
+dat[year %in% 2017 ,sampling := 3]
+dat[year > 2018 ,sampling := 4]
 
 # read in the covariates
-covariates <- readRDS(paste0(country.file,"covariates/covariates_by_ad2.RDS")) %>%
-  rename(department = region)
-optional_cov <- readRDS(paste0(country.file,"../Aim3/prepped_covariates/SEN/combined_u5m_ec_estimates.RDS")) %>%
-  dplyr::select(year,department,u5m,diarrhea_prevalence, map_pf_prevalence, lri_inc)
-hw_density <- readRDS(paste0(country.file,"hw_density/health_worker_density_SEN_ad2.RDS"))
+covariates <- setDT(readRDS(paste0(main_dir,"covariates/covariates_by_ad2.RDS")))
 
-# fixing department names
-hw_density$department[hw_density$department=="m'backe"] <- "mbacke"
-hw_density$department[hw_density$department=="m'bour"] <- "mbour"
-hw_density$department[hw_density$department=="koupentoum"] <- "koumpentoum"
-hw_density$department[hw_density$department=="medina yoro foulah"] <- "medina yoroufoula"
-hw_density$department[hw_density$department=="malem hoddar"] <- "malem hodar"
-hw_density$department[hw_density$department=="tivaouane"] <- "tivaoune"
-
-covariates <- covariates %>%
-  left_join(optional_cov) %>%
-  left_join(hw_density %>%
-              rename(hw_density=hw) %>%
-              dplyr::select(hw_density, department)) #%>%
 # merging the data and the covariates
-dat <- dat %>%
-  full_join(covariates)
-
-# identifying the optimal set of covariates best on VIF
-stepwise_vif_selection(thresh = 5, covariate_data = covariates, keepCovars = c(hw_density))
-library(MASS)
-# Fit the full model for the different indicators
-full.model <- lm(logit_sara_index ~., data = dat[dat$department!="ALL",c("logit_sara_index",names(covariates))] %>%
-                   dplyr::select(-department))
-step.model <- stepAIC(full.model, direction = "both", 
-                      trace = FALSE)
-full.model <- lm(logit_fifteen.assess ~., data = dat[dat$department!="ALL",c("logit_fifteen.assess",names(covariates))] %>%
-                   dplyr::select(-department))
-step.model <- stepAIC(full.model, direction = "both", 
-                      trace = FALSE)
-
+dat <- merge(dat,covariates, by = 'department,year', all.y = T)
 
 #################################
 # --- looking at the shapes --- #
+
 nb.r <- poly2nb(shape2, queen=F)
 mat <- nb2mat(nb.r, style="B",zero.policy=TRUE) # mat is the 0/1 adjacency matrix
 
@@ -90,7 +61,7 @@ mat <- nb2mat(nb.r, style="B",zero.policy=TRUE) # mat is the 0/1 adjacency matri
 ################################################################################
 ################################################################################
 
-indicators<-c("logit_sara_index","logit_fifteen.assess")
+indicators<-c("logit_readiness","logit_process_quality")
 
 
 groups<-expand.grid(outcome=indicators)
