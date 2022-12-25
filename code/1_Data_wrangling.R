@@ -6,6 +6,9 @@
 ##              (requested from the Service Provision Assessment and the Service Delivery Indicators
 ##              surveys), which were formatted to extract the readiness and process_quality metrics
 ##              along with facilities managing authority, facility type, and location.
+##              Raw data were formatted using codes published by DHS and the World Bank on Github:
+##              (i) https://github.com/DHSProgram/DHS-Analysis-Code/tree/main/EffectiveCoverage 
+##              (ii) https://github.com/worldbank/SDI-Health
 ## Requires:    UsefulFunctions/expit_logit.R a script that transforms survey estimates onto the logit scale
 ##              
 ##
