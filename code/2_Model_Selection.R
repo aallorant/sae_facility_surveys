@@ -1,9 +1,25 @@
-#######################################################
-### Identifying the best model
+####################################################################################################
+## Author:      Adrien Allorant
+##
+## Description: Read processed survey data and merge them with spatio-temporally referenced
+##              covariates (including health worker density, derived from census data), and
+##              fit 7 different small area estimation models for each metric (readiness and process quality),
+##              to all facility data, and stratified by managing authority (public/private) 
+##              and by facility type (hospitals, health centers, clinics).
+##              The 7 models include different combinations
+##              of random effects for time, space, survey instrument or sampling, time-space,
+##              and VIF-selected covariates. Several goodness of fit criteria including DIC, LCPO
+##              and WAIC are calculated.
+##
+## Requires:    UsefulFunctions/SAE_models.R a script including all 7 models to be run in INLA
+##              UsefulFunctions/Fit_SAE_models_INLA.R a script that runs the 7 models
+##
+## Outputs:     a CSV file per outcome x managing authority x facility type indicating the value
+##              of each of the 3 criteria for the 7 models.
+##              For example, the 3 criteria for the 7 models run on the readiness metric in ALL public facilities
+##              are saved in the file: "output/ModelSelection/models/readiness_public_ALL.csv"
+####################################################################################################
 
-### this file will read the processed data and fit different 
-### models defined by different combinations of included covariates
-### and will calculate several goodness of fit indicators including DIC, CPO and WAIC.
 
 rm(list=ls())
 

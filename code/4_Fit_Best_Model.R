@@ -1,8 +1,25 @@
+####################################################################################################
+## Author:      Adrien Allorant
+##
+## Description: Read processed survey data and merge them with spatio-temporally referenced
+##              covariates (including health worker density, derived from census data), and
+##              fit the "best" small area estimation model for each metric (readiness and process quality),
+##              to all facility data, and stratified by managing authority (public/private) 
+##              and by facility type (hospitals, health centers, clinics), identified with the 3 criteria
+##              (DIC, LCPO, WAIC).
+##
+## Requires:    UsefulFunctions/SAE_models.R a script including all 7 models to be run in INLA
+##              UsefulFunctions/Fit_SAE_models_INLA.R a script that runs the 7 models
+##
+## Outputs:     a .RDATA file per outcome x managing authority x facility type including
+##              the model fit, and a a .rds file comprising the predictions of the best model.
+####################################################################################################
+
 
 rm(list=ls())
 library(ggplot2)
 
-main_dir <- paste0("<<<< FILEPATH REDACTED >>>>", "/SENEGAL/")
+main_dir <- paste0("<<<< FILEPATH REDACTED >>>>")
 setwd(main_dir)
 
 

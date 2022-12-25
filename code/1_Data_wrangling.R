@@ -1,9 +1,20 @@
-#######################################################
-### Merging the SEN-SPA Surveys  ######################
-#######################################################
-### this file will read in the most recent 
-### versions of these surveys
-### and save with the date.
+####################################################################################################
+## Author:      Adrien Allorant
+##
+## Description: Read and assemble each processed survey data available in a given country.
+##              The processed survey data for each year are obtained from the raw survey data
+##              (requested from the Service Provision Assessment and the Service Delivery Indicators
+##              surveys), which were formatted to extract the readiness and process_quality metrics
+##              along with facilities managing authority, facility type, and location.
+## Requires:    UsefulFunctions/expit_logit.R a script that transforms survey estimates onto the logit scale
+##              
+##
+## Outputs:     a CSV file gathering direct survey estimates of readiness and process
+##              quality metrics, by department, unstratified and stratified by managing
+##              authority and facility type, for every survey year
+####################################################################################################
+
+
 
 rm(list=ls())
 

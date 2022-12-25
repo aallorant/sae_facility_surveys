@@ -1,10 +1,32 @@
-#####################################################
-## Hold-one-area-out cross-validation
-#####################################################
+####################################################################################################
+## Author:      Adrien Allorant
+##
+## Description: Read processed survey data and merge them with spatio-temporally referenced
+##              covariates (including health worker density, derived from census data), to
+##              perform hold-one-area-out cross-validation for each metric (readiness and process quality),
+##              to all facility data, and stratified by managing authority (public/private) 
+##              and by facility type (hospitals, health centers, clinics).
+##              First, we identify subnational areas and years for which survey data are available,
+##              and where the survey estimates are deemed 'precise enough'. 
+##              We build a validation dataset made of the subnational areas where
+##              the survey estimates have precision in the top 50% of the estimates' precision.
+##              We iteratively exclude all observations from each area of this validation dataset
+##              and re-fit the model without them; we save both the model-predictions and the
+##              direct survey estimates.
+##
+## Requires:    UsefulFunctions/SAE_models.R a script including all 7 models to be run in INLA
+##              UsefulFunctions/Fit_SAE_models_INLA.R a script that runs the 7 models
+##
+## Outputs:     a .RDATA file per outcome x managing authority x facility type including both the
+##              model prediction for the area that was held-out and the direct survey estimate for this
+##              area.
+######################################################################################################
+
+
 rm(list=ls())
 
 
-main_dir <- paste0("<<<< FILEPATH REDACTED >>>>", "/SENEGAL/")
+main_dir <- paste0("<<<< FILEPATH REDACTED >>>>")
 setwd(main_dir)
 
 #####################################
@@ -130,11 +152,13 @@ for(j in 1:nrow(results)){
   mod_dat<-mod_dat%>%mutate(outcome=ifelse(is.na(prec),NA,outcome),
                             prec=ifelse(is.na(outcome),NA,prec))
   
-  # need to focus on location x year where we have data in the survey
-  validation_dataset <- mod_dat %>%
-    dplyr::select(year, department, outcome, prec) %>%
-    mutate(prec = ifelse(prec > 1, prec, NA)) %>%
-    filter(complete.cases(.)) %>%
+  # need to focus on locations x years where we have data in the survey
+  # with enough precision to consider survey estimates 'reliable'
+  # we select the top 50% of estimates with lowest variance/highest precision
+  
+  prec_thresh <- quantile(validation_dataset$prec, probs = .5)
+  validation_dataset <-  validation_dataset %>%
+    filter(prec > prec_thresh) %>%
     dplyr::select(year, department) %>%
     distinct()
   

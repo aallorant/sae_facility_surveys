@@ -1,13 +1,21 @@
-#######################################################
-### Identifying the best model
-
-### this file will read the fitted
-### models and compare them in terms of goodness of fit indicators including DIC, CPO and WAIC.
-### Finally, it saves the best performing model across these indicators.
+####################################################################################################
+## Author:      Adrien Allorant
+##
+## Description: Read for each outcome and each combinations of managing authority and facility type
+##              (including ALL) the CSV file including the values of the 3 criteria for the 7 models
+##              and save the model with the highest performance across these criteria.
+##              If criteria points to different models as best models, we use a majority rule.
+##              
+## Requires:    a CSV file per outcome x managing authority x facility type indicating the value
+##              of each of the 3 criteria for the 7 models.
+##
+## Outputs:     a CSV file per outcome x managing authority x facility type indicating the best of the
+##              7 models according to the 3 criteria.
+####################################################################################################
 
 rm(list=ls())
 
-main_dir <- paste0("<<<< FILEPATH REDACTED >>>>", "/SENEGAL/")
+main_dir <- paste0("<<<< FILEPATH REDACTED >>>>")
 setwd(main_dir)
 
 #####################################
@@ -22,7 +30,7 @@ source("UsefulFunctions/expit_logit.R")
 ################################################################################
 
 
-indicators<-c("logit_sara_index","logit_fifteen.assess")
+indicators<-c("logit_readiness","logit_process_quality")
 
 groups<-expand.grid(outcome=indicators)
 groups_all<-data.frame(outcome=indicators)
@@ -40,8 +48,8 @@ results$model<-results$time<-results$space<-NA
 
 for(j in 1:nrow(results)){
   
-  tmp<-read_csv(paste0("output/ModelSelection/models",
-                                 "_",results$outcome[j],".csv"))
+  tmp<-read_csv(paste0("output/ModelSelection/models","_",results$outcome[j],"_",results$mga[j],
+                       "_",results$factype[j],".csv"))
   
   min_row_waic<-which(tmp$WAIC==min(tmp$WAIC))[1]
   min_row_dic<-which(tmp$DIC==min(tmp$DIC))[1]
